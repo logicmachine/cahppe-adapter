@@ -1,32 +1,66 @@
-using System.Collections;
-using System.Collections.Generic;
-
+using System;
 using dev.logilabo.cahppe_adapter.runtime;
 using nadena.dev.ndmf;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Animations;
 using VirtualLens2;
+using Object = UnityEngine.Object;
 
 namespace dev.logilabo.cahppe_adapter.editor
 {
     public class CAHppeAdapterPass : Pass<CAHppeAdapterPass>
     {
-        private static void ModifyVirtualLens2(CAHppeAdapter config)
+        private enum CAHppeVersion { V1, V2 }
+
+        private static CAHppeVersion DetectVersion(CAHppeAdapter config)
         {
-            var virtualLens = config.virtualLensSettings.GetComponent<VirtualLensSettings>();
-            var target = HierarchyUtility.PathToObject(config.cahppeObject.transform, "World Constraint 1/Camera");
-            virtualLens.externalPoseSource = target;
+            if (config?.cahppeObject == null) { throw new ArgumentException("CAHppe Object is not specified."); }
+            var root = config.cahppeObject.transform;
+            if (HierarchyUtility.PathToObject(root, "World Constraint 1/Camera") != null)
+            {
+                return CAHppeVersion.V1;
+            }
+            if (HierarchyUtility.PathToObject(root, "Camera/Smooth Look At") != null)
+            {
+                return CAHppeVersion.V2;
+            }
+            throw new ArgumentException("Failed to detect the CAHppe version.");
         }
 
-        private static void ModifyCAHppe(CAHppeAdapter config)
+        private static void ModifyVirtualLens2(CAHppeAdapter config, CAHppeVersion version)
+        {
+            var virtualLens = config.virtualLensSettings.GetComponent<VirtualLensSettings>();
+            if (version == CAHppeVersion.V1)
+            {
+                virtualLens.externalPoseSource =
+                    HierarchyUtility.PathToObject(config.cahppeObject.transform, "World Constraint 1/Camera");
+            }
+            else if(version == CAHppeVersion.V2)
+            {
+                virtualLens.externalPoseSource =
+                    HierarchyUtility.PathToObject(config.cahppeObject.transform, "Camera/Smooth Look At");
+            }
+        }
+
+        private static void ModifyCAHppe(CAHppeAdapter config, CAHppeVersion version)
         {
             // Remove camera and screen space renderer to override
-            var camera = HierarchyUtility.PathToObject(config.cahppeObject, "World Constraint 1/Camera");
-            Object.DestroyImmediate(camera.GetComponent<Camera>());
-            var screenSpace = HierarchyUtility.PathToObject(config.cahppeObject, "ScreenSpace");
-            Object.DestroyImmediate(screenSpace.GetComponent<SkinnedMeshRenderer>());
-            
+            if (version == CAHppeVersion.V1)
+            {
+                var camera = HierarchyUtility.PathToObject(config.cahppeObject, "World Constraint 1/Camera");
+                Object.DestroyImmediate(camera.GetComponent<Camera>());
+                var screenSpace = HierarchyUtility.PathToObject(config.cahppeObject, "ScreenSpace");
+                Object.DestroyImmediate(screenSpace.GetComponent<SkinnedMeshRenderer>());
+            }
+            else if (version == CAHppeVersion.V2)
+            {
+                var cameras = HierarchyUtility.PathToObject(config.cahppeObject, "Camera/Smooth Look At");
+                foreach (var camera in cameras.GetComponentsInChildren<Camera>()) { Object.DestroyImmediate(camera); }
+                var screenSpace = HierarchyUtility.PathToObject(config.cahppeObject, "ScreenSpace");
+                Object.DestroyImmediate(screenSpace.GetComponent<SkinnedMeshRenderer>());
+            }
+
             // Add animator controller to expose parameter `ScreenCam`
             var guid = "ae319e590870641469d9fac27db2177a";
             var controllerPath = AssetDatabase.GUIDToAssetPath(guid);
@@ -66,8 +100,9 @@ namespace dev.logilabo.cahppe_adapter.editor
         private static void ExecuteSingle(BuildContext context, CAHppeAdapter config)
         {
             // TODO validate configurations
-            ModifyVirtualLens2(config);
-            ModifyCAHppe(config);
+            var version = DetectVersion(config);
+            ModifyVirtualLens2(config, version);
+            ModifyCAHppe(config, version);
         }
         
         protected override void Execute(BuildContext context)
