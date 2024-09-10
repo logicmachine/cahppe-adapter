@@ -1,10 +1,12 @@
 using System;
 using dev.logilabo.cahppe_adapter.runtime;
+using nadena.dev.modular_avatar.core;
 using nadena.dev.ndmf;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Animations;
 using VirtualLens2;
+using VRC.SDK3.Avatars.Components;
 using Object = UnityEngine.Object;
 
 namespace dev.logilabo.cahppe_adapter.editor
@@ -65,6 +67,7 @@ namespace dev.logilabo.cahppe_adapter.editor
             var guid = "ae319e590870641469d9fac27db2177a";
             var controllerPath = AssetDatabase.GUIDToAssetPath(guid);
             var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
+            var foundFury = false;
             foreach (var component in config.cahppeObject.GetComponents<Component>())
             {
                 var so = new SerializedObject(component);
@@ -93,7 +96,16 @@ namespace dev.logilabo.cahppe_adapter.editor
                     item.stringValue = "CAHppeAdapter/ScreenCam";
                 }
                 so.ApplyModifiedPropertiesWithoutUndo();
+                foundFury = true;
                 break;
+            }
+            if (!foundFury)
+            {
+                // CA is installed manually (no VRCFury). Use MA to merge parameter cloner.
+                var ma = config.gameObject.AddComponent<ModularAvatarMergeAnimator>();
+                ma.layerType = VRCAvatarDescriptor.AnimLayerType.FX;
+                ma.animator = controller;
+                ma.pathMode = MergeAnimatorPathMode.Absolute;
             }
         }
 
