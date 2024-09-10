@@ -14,6 +14,9 @@
     },
     "com.vrcfury.vrcfury": {
       "version": "1.1004.0"
+    },
+    "dev.vrlabs.av3manager": {
+      "version": "2.0.33"
     }
   },
   "locked": {
@@ -47,6 +50,12 @@
     "com.vrcfury.vrcfury": {
       "version": "1.1004.0",
       "dependencies": {}
+    },
+    "dev.vrlabs.av3manager": {
+      "version": "2.0.33",
+      "dependencies": {
+        "com.vrchat.avatars": "3.2-3.7"
+      }
     }
   }
 }
